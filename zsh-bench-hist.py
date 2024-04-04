@@ -3,6 +3,7 @@
 """This application processes the output of `zsh-bench --raw` to visualize it as ASCII histograms."""
 
 import argparse
+import math
 import re
 import sys
 import statistics
@@ -56,7 +57,7 @@ def display_histogram(histogram: list, bin_width: float, min_value: float = 0.0,
         print(f'[{bin_start:{float_format}}, {bin_end:{float_format}}{interval_closing_brace}:', bar)
 
 
-def display_timing_histograms(timings: dict, bin_count: int):
+def display_timing_histograms(timings: dict, bin_count: int, logarithmic: bool):
     """Visualize the timings as textual histogram each."""
     for name, values in timings.items():
         print(f'Histogram for {name}')
@@ -65,11 +66,15 @@ def display_timing_histograms(timings: dict, bin_count: int):
         bin_width = (max_value - min_value) / bin_count
 
         histogram = generate_histogram(data=values, bin_count=bin_count, min_value=min_value, bin_width=bin_width)
+
+        if logarithmic:
+            histogram = [math.ceil(math.log(x+1, 2)) for x in histogram]
+
         display_histogram(histogram, min_value=min_value, bin_width=bin_width)
         print()
 
 
-def display_timings(timings: dict, bin_count: int):
+def display_timings(timings: dict, bin_count: int, logarithmic: bool = False):
     """Display the settings and visualize the timings as textual histogram each."""
     constants = ['creates_tty', 'has_compsys', 'has_syntax_highlighting', 'has_autosuggestions', 'has_git_prompt']
     table_width = max(map(len, timings.keys()))  # calculate width for formatting the table
@@ -93,19 +98,20 @@ def display_timings(timings: dict, bin_count: int):
         print_metric_info(metric, min_value, median_value, max_value, width=table_width)
     print()
 
-    display_timing_histograms(timings, bin_count=bin_count)
+    display_timing_histograms(timings, bin_count=bin_count, logarithmic=logarithmic)
 
 
 def main():
     """Parse zsh-bench data from stdin, Display the settings, and Visualize the timings as textual histogram each."""
     parser = argparse.ArgumentParser(description='Visualizer of zsh-bench --raw output')
-    parser.add_argument('--bin-count', type=int, default=10,
-                        help='Histogram bin count (default: 10, minimum: 1), optional')
+    parser.add_argument('--bin-count', type=int, default=10, help='Histogram bin count (default: 10, minimum: 1).')
+    parser.add_argument('--logarithmic', action='store_true', help='Use logarithmic histogram mode.')
+
 
     args = parser.parse_args()
     command_output = sys.stdin.read()
     timings = extract_timings(command_output)
-    display_timings(timings=timings, bin_count=args.bin_count)
+    display_timings(timings=timings, bin_count=args.bin_count, logarithmic=args.logarithmic)
 
 
 if __name__ == '__main__':
